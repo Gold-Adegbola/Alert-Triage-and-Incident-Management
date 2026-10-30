@@ -8,7 +8,7 @@ The result is five tickets. Three are true positives (one Critical and two High)
 
 ## What is in this repo
 
-- `full-writeup.md` is the long version of the project, including the MITRE ATT&CK mapping, also available as `full-writeup.pdf`.
+- `docs/full-writeup.md` is the long version of the project, including the MITRE ATT&CK mapping, also available as `docs/full-writeup.pdf`.
 - `spl/` has the five detection searches with their ServiceNow alert action settings, and the searches I used while investigating.
 - `images/` holds the evidence. The ServiceNow instance name is covered and no credentials are shown.
 
@@ -84,4 +84,4 @@ The default ServiceNow action in the add-on failed. The scheduler in Splunk repo
 
 ## Where to read next
 
-Start with INC0010005 for the most detailed investigation, or read [the full write-up](full-writeup.md) for how the whole workflow was built.
+Start with INC0010005 for the most detailed investigation, or read [the full write-up](docs/full-writeup.md) for how the whole workflow was built.
