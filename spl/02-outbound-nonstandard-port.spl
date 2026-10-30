@@ -1,0 +1,17 @@
+index=botsv1 sourcetype=stream:http src_ip=192.168.0.0/16 NOT dest_ip=192.168.0.0/16 NOT dest_ip=10.0.0.0/8 NOT dest_ip=172.16.0.0/12 NOT (dest_port=80 OR dest_port=443) earliest="08/10/2016:00:00:00" latest="08/11/2016:00:00:00"
+| stats count min(_time) as first_seen values(site) as sites values(uri_path) as uris by src_ip, dest_ip, dest_port
+| eval first_seen=strftime(first_seen,"%Y-%m-%d %H:%M:%S")
+| table first_seen src_ip dest_ip dest_port count sites uris
+
+
+```ALERT ACTION SETTINGS for: Outbound HTTP to Non-Standard Port from Internal Host
+Common to every alert: scheduled with cron */5 * * * *, trigger when results > 0, ServiceNow Generic Record Integration action, account sn_dev, table incident.
+Trigger: for each result. Throttle off.
+
+Unique identifier:
+
+correlation_id=outbound-$result.src_ip$-$result.dest_ip$-$result.dest_port$
+
+Fields:
+
+short_description=Internal host $result.src_ip$ made outbound HTTP requests to $result.dest_ip$ on non-standard port $result.dest_port$ - review required||description=Splunk alert $name$ fired. Internal host $result.src_ip$ sent $result.count$ HTTP request(s) to external address $result.dest_ip$ port $result.dest_port$ (site: $result.sites$, path: $result.uris$), first seen $result.first_seen$ (Splunk time). Web servers do not normally start outbound connections to unfamiliar hosts on non-standard ports. Review required: what is the host, what triggered the request, and is it linked to other activity?||impact=2||urgency=2||correlation_id=outbound-$result.src_ip$-$result.dest_ip$-$result.dest_port$||work_notes=Created automatically by Splunk saved search for outbound HTTP to non-standard ports from internal hosts (index botsv1, sourcetype stream:http). Not yet investigated.```

@@ -1,0 +1,19 @@
+index=botsv1 sourcetype=stream:http http_method=POST uri_path="*administrator*" earliest="08/10/2016:00:00:00" latest="08/11/2016:00:00:00"
+| bin _time span=5m
+| stats count values(http_user_agent) as user_agents by _time, src_ip, dest_ip, uri_path
+| where count > 20
+| eval window_start=strftime(_time,"%Y-%m-%d %H:%M:%S")
+| table window_start src_ip dest_ip uri_path count user_agents
+
+
+```ALERT ACTION SETTINGS for: Repeated Admin Login Attempts - Single Source
+Common to every alert: scheduled with cron */5 * * * *, trigger when results > 0, ServiceNow Generic Record Integration action, account sn_dev, table incident.
+Trigger: for each result. I first set a 7 day throttle on `src_ip` and switched it off while testing.
+
+Unique identifier:
+
+correlation_id=bruteforce-$result.src_ip$
+
+Fields:
+
+short_description=Repeated admin login POSTs from $result.src_ip$ to $result.dest_ip$ - review required||description=Splunk alert $name$ fired. Source IP $result.src_ip$ sent $result.count$ POST requests to $result.uri_path$ on $result.dest_ip$ in a 5 minute window starting $result.window_start$ (Splunk time). User agent: $result.user_agents$. Review required: was any attempt successful and was anything done afterwards?||impact=2||urgency=2||state=1||correlation_id=bruteforce-$result.src_ip$||work_notes=Created automatically by Splunk saved search Repeated Admin Login Attempts - Single Source (index botsv1, sourcetype stream:http, POSTs to administrator paths, more than 20 per source IP in 5 minutes). Not yet investigated.```

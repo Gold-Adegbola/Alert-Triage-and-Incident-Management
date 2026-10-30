@@ -1,0 +1,17 @@
+index=botsv1 sourcetype=WinEventLog:Security EventCode=4697 earliest="08/01/2016:00:00:00" latest="09/01/2016:00:00:00"
+| stats count min(_time) as first_seen values(Service_Name) as services values(Service_File_Name) as files values(Service_Account) as accounts values(Account_Name) as creators by host
+| eval first_seen=strftime(first_seen,"%Y-%m-%d %H:%M:%S"), services=mvjoin(services,", "), files=mvjoin(files," / "), accounts=mvjoin(accounts,", "), creators=mvjoin(creators,", ")
+| table first_seen host count services files accounts creators
+
+
+```ALERT ACTION SETTINGS for: New Service Installed on Host
+Common to every alert: scheduled with cron */5 * * * *, trigger when results > 0, ServiceNow Generic Record Integration action, account sn_dev, table incident.
+Trigger: for each result. Throttle off.
+
+Unique identifier:
+
+correlation_id=svcinstall-$result.host$
+
+Fields:
+
+short_description=New services installed on $result.host$ - review required||description=Splunk alert $name$ fired. Windows Security event 4697 recorded $result.count$ service installations on $result.host$ at $result.first_seen$ (Splunk time): $result.services$. Service file: $result.files$. Service account: $result.accounts$. Created by: $result.creators$. A new service can be used to keep access to a system. Review required: are these services expected on this system?||impact=2||urgency=2||correlation_id=svcinstall-$result.host$||work_notes=Created automatically by Splunk saved search for service installation (index botsv1, sourcetype WinEventLog:Security, event 4697). Not yet investigated.```

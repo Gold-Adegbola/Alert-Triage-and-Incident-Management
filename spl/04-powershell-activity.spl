@@ -1,0 +1,17 @@
+index=botsv1 sourcetype=WinEventLog:Security EventCode=4688 powershell earliest="08/01/2016:00:00:00" latest="09/01/2016:00:00:00"
+| stats count dc(host) as hosts values(host) as host_list min(_time) as first_seen max(_time) as last_seen
+| eval first_seen=strftime(first_seen,"%Y-%m-%d %H:%M:%S"), last_seen=strftime(last_seen,"%Y-%m-%d %H:%M:%S"), host_list=mvjoin(host_list,", ")
+| table first_seen last_seen count hosts host_list
+
+
+```ALERT ACTION SETTINGS for: PowerShell Process Creation Activity
+Common to every alert: scheduled with cron */5 * * * *, trigger when results > 0, ServiceNow Generic Record Integration action, account sn_dev, table incident.
+Trigger: once. Throttle off.
+
+Unique identifier:
+
+correlation_id=powershell-activity
+
+Fields:
+
+short_description=PowerShell process activity recorded on $result.hosts$ hosts - review required||description=Splunk alert $name$ fired. Windows Security event 4688 recorded $result.count$ process creations involving PowerShell on $result.hosts$ hosts ($result.host_list$) between $result.first_seen$ and $result.last_seen$ (Splunk time). PowerShell can be used legitimately and by attackers. Review required: which processes and command lines are involved, and is any of it unexpected?||impact=2||urgency=2||correlation_id=powershell-activity||work_notes=Created automatically by Splunk saved search for PowerShell process creation (index botsv1, sourcetype WinEventLog:Security, event 4688). Not yet investigated.```

@@ -1,0 +1,20 @@
+index=botsv1 sourcetype=suricata earliest="08/10/2016:00:00:00" latest="08/11/2016:00:00:00"
+| rename alert.signature as signature
+| search signature="*WEB_SERVER*" OR signature="*SCAN*"
+| stats count dc(signature) as distinct_signatures min(_time) as first_seen max(_time) as last_seen values(signature) as signatures by src_ip, dest_ip
+| where count > 50 AND distinct_signatures > 5
+| eval first_seen=strftime(first_seen,"%Y-%m-%d %H:%M:%S"), last_seen=strftime(last_seen,"%Y-%m-%d %H:%M:%S"), examples=replace(mvjoin(mvindex(signatures,0,3),"; "),"[=|]","")
+| table first_seen last_seen src_ip dest_ip count distinct_signatures examples
+
+
+```ALERT ACTION SETTINGS for: Multiple Web Attack Signatures from Single Source
+Common to every alert: scheduled with cron */5 * * * *, trigger when results > 0, ServiceNow Generic Record Integration action, account sn_dev, table incident.
+Trigger: for each result. Throttle off.
+
+Unique identifier:
+
+correlation_id=websweep-$result.src_ip$-$result.dest_ip$
+
+Fields:
+
+short_description=Multiple web attack signatures from $result.src_ip$ against $result.dest_ip$ - review required||description=Splunk alert $name$ fired. Suricata recorded $result.count$ web attack or scan alerts ($result.distinct_signatures$ distinct signatures) from external source $result.src_ip$ against $result.dest_ip$ between $result.first_seen$ and $result.last_seen$ (Splunk time). Examples: $result.examples$. These alerts show attempted attacks, not confirmed success. Review required: did any attempt succeed, and what did this source do next?||impact=2||urgency=2||correlation_id=websweep-$result.src_ip$-$result.dest_ip$||work_notes=Created automatically by Splunk saved search for multiple web attack signatures from one source (index botsv1, sourcetype suricata). Not yet investigated.```

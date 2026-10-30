@@ -1,0 +1,151 @@
+```Searches I ran while checking the data and working each ticket. The index is botsv1. The earliest and latest values in the five alert searches are fixed to the 2016 window because BOTS v1 is historical data. In a live environment I would use a relative window such as the last 15 minutes. The eval lines in the alert searches avoid the characters = and | in their output because the ServiceNow Fields box uses them as separators. IPs and host names in the searches below come from this dataset.```
+
+```Checking what the data holds. What was ingested:```
+index=botsv1
+| stats count by sourcetype
+| sort -count
+
+```Logon events (this returned successful logons only):```
+index=botsv1 sourcetype=WinEventLog:Security (EventCode=4625 OR EventCode=4624)
+| stats count by EventCode, host
+
+```Account creation, group change and privilege events (only 4672 came back):```
+index=botsv1 sourcetype=WinEventLog:Security (EventCode=4720 OR EventCode=4728 OR EventCode=4732 OR EventCode=4756 OR EventCode=4672)
+| stats count by EventCode, host
+
+```Every Security event code that exists:```
+index=botsv1 sourcetype=WinEventLog:Security
+| stats count by EventCode
+| sort -count
+
+```INC0010004: Joomla admin login attempts
+
+Which sources send the most POSTs:```
+index=botsv1 sourcetype=stream:http http_method=POST
+| stats count by src_ip, dest_ip, uri_path
+| sort -count
+| head 20
+
+```The login attempts from the first source:```
+index=botsv1 sourcetype=stream:http src_ip=23.22.63.114 dest_ip=192.168.250.70 http_method=POST uri_path="/joomla/administrator/index.php"
+| table _time src_ip uri_path status http_user_agent form_data
+| sort _time
+| head 20
+
+```Response status, count and time range per source:```
+index=botsv1 sourcetype=stream:http dest_ip=192.168.250.70 uri_path="/joomla/administrator/index.php" http_method=POST
+| stats count min(_time) as first max(_time) as last by src_ip, status
+| convert ctime(first) ctime(last)
+
+```The second source posting to the same page:```
+index=botsv1 sourcetype=stream:http src_ip=40.80.148.42 dest_ip=192.168.250.70 http_method=POST uri_path="/joomla/administrator/index.php"
+| table _time src_ip status http_user_agent form_data
+| sort _time
+
+```Passwords seen from more than one source:```
+index=botsv1 sourcetype=stream:http dest_ip=192.168.250.70 http_method=POST uri_path="/joomla/administrator/index.php"
+| rex field=form_data "passwd=(?<passwd>[^&]+)"
+| stats count values(src_ip) as src_ips by passwd
+| where mvcount(src_ips)>1
+
+```Every attempt that used the shared password:```
+index=botsv1 sourcetype=stream:http dest_ip=192.168.250.70 http_method=POST uri_path="/joomla/administrator/index.php" form_data="*passwd=batman*"
+| table _time src_ip status http_user_agent
+| sort _time
+
+```What the second source did in the admin area:```
+index=botsv1 sourcetype=stream:http src_ip=40.80.148.42 dest_ip=192.168.250.70 uri_path="/joomla/administrator/*"
+| table _time http_method uri_path status
+| sort _time
+
+```The package upload request, decoded:```
+index=botsv1 sourcetype=stream:http src_ip=40.80.148.42 http_method=POST form_data="install_package*"
+| eval payload=urldecode(form_data)
+| table _time dest_ip uri_path status payload
+
+```What the first source requested overall:```
+index=botsv1 sourcetype=stream:http src_ip=23.22.63.114 dest_ip=192.168.250.70
+| stats count by http_method, uri_path, status
+| sort -count
+
+```Who requested `agent.php`, and when:```
+index=botsv1 sourcetype=stream:http dest_ip=192.168.250.70 uri_path="/joomla/agent.php"
+| stats count min(_time) as first max(_time) as last by src_ip, http_method
+| convert ctime(first) ctime(last)
+
+```INC0010005: web server outbound traffic
+
+Headers on the `agent.php` requests:```
+index=botsv1 sourcetype=stream:http dest_ip=192.168.250.70 uri_path="/joomla/agent.php"
+| table _time http_referrer accept_language http_user_agent status
+| head 5
+
+```Where the web server connects to:```
+index=botsv1 src_ip=192.168.250.70 (sourcetype=stream:http OR sourcetype=fgt_traffic)
+| stats count by dest_ip
+| sort -count
+| head 20
+
+```The routine destination:```
+index=botsv1 src_ip=192.168.250.70 dest_ip=108.161.187.134
+| table _time sourcetype site uri_path
+| sort _time
+
+```The unexplained destination:```
+index=botsv1 src_ip=192.168.250.70 dest_ip=23.22.63.114 (sourcetype=stream:http OR sourcetype=fgt_traffic)
+| sort _time
+
+```INC0010006: web attack signatures
+
+Signatures by source:```
+index=botsv1 sourcetype=suricata dest_ip=192.168.250.70
+| stats count by alert.signature, src_ip
+| sort -count
+
+```When the scan started, by first request per path:```
+index=botsv1 sourcetype=stream:http src_ip=40.80.148.42 dest_ip=192.168.250.70
+| stats min(_time) as first count by uri_path
+| sort first
+| convert ctime(first)
+
+```INC0010007: PowerShell
+
+Security process creation events by host:```
+index=botsv1 sourcetype=WinEventLog:Security EventCode=4688 powershell
+| stats count by host
+
+```Sysmon event types and images that mention PowerShell. The Sysmon fields were not extracted in my ingest, so these use `rex` on the raw text:```
+index=botsv1 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" powershell
+| rex field=_raw "<EventID>(?<EventID>\d+)</EventID>"
+| rex field=_raw "Name='Image'>(?<Image>[^<]+)<"
+| stats count by EventID, Image
+| sort -count
+
+```Security process creation without the Splunk forwarder's helper:```
+index=botsv1 sourcetype=WinEventLog:Security EventCode=4688 powershell
+| search NOT New_Process_Name="*splunk-powershell.exe"
+| table _time host Account_Name New_Process_Name Process_Command_Line Creator_Process_ID
+
+```Sysmon process creations that mention PowerShell:```
+index=botsv1 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" powershell
+| rex field=_raw "<EventID>(?<EventID>\d+)</EventID>"
+| search EventID=1
+| rex field=_raw "Name='Image'>(?<Image>[^<]+)<"
+| rex field=_raw "Name='CommandLine'>(?<CommandLine>[^<]+)<"
+| rex field=_raw "Name='ParentImage'>(?<ParentImage>[^<]+)<"
+| table _time host Image CommandLine ParentImage
+
+```The Nessus scan record:```
+index=botsv1 sourcetype="nessus:scan"
+| head 3
+
+```INC0010008: service installs
+
+Service details:```
+index=botsv1 sourcetype=WinEventLog:Security EventCode=4697
+| table _time host Account_Name Service_Name Service_File_Name Service_Account
+| sort _time
+
+```Network share events on the same host:```
+index=botsv1 sourcetype=WinEventLog:Security EventCode=5142 host=we8105desk
+| table _time Share_Name Share_Path
